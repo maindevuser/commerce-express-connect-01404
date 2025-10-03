@@ -264,8 +264,6 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     </style>
 </head>
 <body>
-    <?php include __DIR__ . '/../../views/partials/admin-header.php'; ?>
-    
     <div class="sync-classes-container">
         <div class="page-header">
             <h1><i class="fas fa-video"></i> Gestión de Clases Sincrónicas</h1>
