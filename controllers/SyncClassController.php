@@ -13,6 +13,7 @@ require_once __DIR__ . '/../controllers/AuthController.php';
 use Models\SyncClass;
 use Models\UserSyncClass;
 use Controllers\AuthController;
+use PDO;
 use Exception;
 
 class SyncClassController {
@@ -111,11 +112,52 @@ class SyncClassController {
             return $cart_items;
         }
         
-        foreach ($_SESSION['cart_sync_classes'] as $item) {
-            $cart_items[] = $item;
+        foreach ($_SESSION['cart_sync_classes'] as $key => $item) {
+            try {
+                // Detectar si $item es un array o un ID simple
+                $classId = is_array($item) ? $item['id'] : $item;
+                
+                $syncClass = $this->syncClassModel->readOne($classId);
+                
+                if ($syncClass) {
+                    $cart_items[] = [
+                        'id' => $syncClass['id'],
+                        'title' => $syncClass['title'],
+                        'price' => floatval($syncClass['price'] ?? 0),
+                        'description' => $syncClass['description'] ?? '',
+                        'start_date' => $syncClass['start_date'],
+                        'end_date' => $syncClass['end_date'],
+                        'meeting_link' => $syncClass['meeting_link'],
+                        'quantity' => 1,
+                        'type' => 'sync_class'
+                    ];
+                }
+            } catch (Exception $e) {
+                error_log("Error obteniendo clase del carrito: " . $e->getMessage());
+            }
         }
         
         return $cart_items;
+    }
+    
+    public function calculateTotals($items) {
+        $subtotal = 0;
+        foreach ($items as $item) {
+            $subtotal += floatval($item['price']);
+        }
+        
+        $tax_rate = 0.07; // 7% de impuesto
+        
+        $tax = $subtotal * $tax_rate;
+        $total = $subtotal + $tax;
+        
+        return [
+            'subtotal' => $subtotal,
+            'discount' => 0,
+            'tax' => $tax,
+            'total' => $total,
+            'promo_code_applied' => null
+        ];
     }
     
     private function sendJsonResponse($status, $message, $data = []) {
