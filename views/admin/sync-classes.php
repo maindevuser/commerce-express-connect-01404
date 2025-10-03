@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../config/Database.php';
 require_once __DIR__ . '/../../models/SyncClass.php';
 use Models\SyncClass;
 
+$currentUser = AuthController::getCurrentUser();
 $database = new \Database();
 $db = $database->getConnection();
 $syncClassModel = new SyncClass($db);
@@ -105,185 +106,566 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     <link rel="stylesheet" href="<?php echo $base_url; ?>/public/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .sync-classes-container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 2rem;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        
-        .page-header {
-            margin-bottom: 2rem;
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: #2d3748;
         }
-        
-        .alert {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 8px;
+
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
         }
-        
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
         }
-        
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
-        .class-form {
+
+        .sidebar-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 1rem 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            position: relative;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            background: rgba(255, 255, 255, 0.1);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::before {
+            width: 100%;
+        }
+
+        .nav-link:hover {
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-left-color: #fbbf24;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-link i {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .content-header {
             background: white;
             padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .content-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .content-header h1 i {
+            color: #6366f1;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-weight: 500;
+            background: #f8fafc;
+            padding: 0.75rem 1.25rem;
+            border-radius: 50px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .user-info i {
+            color: #6366f1;
+            font-size: 1.1rem;
+        }
+
+        /* Flash Messages */
+        .flash-message {
+            padding: 1rem 2rem;
+            margin: 0;
+            border: none;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .flash-success {
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .flash-error {
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        /* Content Section */
+        .content-section {
+            padding: 2rem;
+        }
+
+        .section-header {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-header p {
+            color: #64748b;
+        }
+
+        /* Form Styles */
+        .class-form {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
             margin-bottom: 2rem;
         }
-        
+
+        .class-form h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .class-form h2 i {
+            color: #6366f1;
+        }
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
         }
-        
+
         .form-group {
             display: flex;
             flex-direction: column;
         }
-        
+
         .form-group.full-width {
             grid-column: 1 / -1;
         }
-        
+
         .form-group label {
             font-weight: 600;
             margin-bottom: 0.5rem;
-            color: #333;
+            color: #374151;
+            font-size: 0.9rem;
         }
-        
+
         .form-group input,
-        .form-group textarea {
+        .form-group textarea,
+        .form-group select {
             padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
             font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            transition: all 0.3s;
         }
-        
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
         .form-group textarea {
             min-height: 100px;
             resize: vertical;
         }
-        
+
         .form-actions {
             display: flex;
             gap: 1rem;
-            margin-top: 1.5rem;
+            margin-top: 2rem;
         }
-        
+
         .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
             padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary {
-            background: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .classes-table {
-            background: white;
             border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
-        .classes-table table {
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #64748b, #475569);
+            color: white;
+            box-shadow: 0 4px 15px rgba(100, 116, 139, 0.3);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(100, 116, 139, 0.4);
+        }
+
+        /* Table Styles */
+        .classes-table-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f1f5f9;
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 2rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .table-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .table-header h2 i {
+            color: #6366f1;
+        }
+
+        .classes-table {
             width: 100%;
             border-collapse: collapse;
         }
-        
+
         .classes-table th,
         .classes-table td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #f1f5f9;
         }
-        
+
         .classes-table th {
-            background: var(--primary-color);
-            color: white;
+            background: #f8fafc;
             font-weight: 600;
+            color: #374151;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        
+
+        .classes-table tr:hover {
+            background: #f8fafc;
+        }
+
         .status-badge {
+            display: inline-block;
             padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        
+
         .status-active {
-            background: #d4edda;
-            color: #155724;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
         }
-        
+
         .status-inactive {
-            background: #f8d7da;
-            color: #721c24;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
         }
-        
+
         .action-buttons {
             display: flex;
             gap: 0.5rem;
         }
-        
+
         .btn-sm {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
         }
-        
+
         .btn-edit {
-            background: #ffc107;
-            color: #000;
-        }
-        
-        .btn-delete {
-            background: #dc3545;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
             color: white;
+        }
+
+        .btn-delete {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-edit:hover,
+        .btn-delete:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-back {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #64748b;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: #d1d5db;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+                padding: 1.5rem;
+            }
+
+            .content-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .content-section {
+                padding: 1rem;
+            }
+
+            .class-form {
+                padding: 1.5rem;
+            }
+
+            .classes-table {
+                font-size: 0.85rem;
+            }
+
+            .classes-table th,
+            .classes-table td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
         }
     </style>
 </head>
 <body>
-    <div class="sync-classes-container">
-        <div class="page-header">
-            <h1><i class="fas fa-video"></i> Gestión de Clases Sincrónicas</h1>
-            <p>Crea y gestiona las clases en vivo para tus estudiantes</p>
-        </div>
-        
-        <?php if (isset($success_message)): ?>
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> <?php echo $success_message; ?>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-graduation-cap"></i> Admin Panel</h2>
             </div>
-        <?php endif; ?>
-        
-        <?php if (isset($error_message)): ?>
-            <div class="alert alert-error">
-                <i class="fas fa-exclamation-triangle"></i> <?php echo $error_message; ?>
-            </div>
-        <?php endif; ?>
-        
-        <div class="class-form">
-            <h2><?php echo $editClass ? 'Editar' : 'Nueva'; ?> Clase Sincrónica</h2>
+            <nav class="sidebar-nav">
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=dashboard" class="nav-link">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=users" class="nav-link">
+                    <i class="fas fa-users"></i> Usuarios
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=courses" class="nav-link">
+                    <i class="fas fa-book"></i> Cursos
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=sync-classes" class="nav-link active">
+                    <i class="fas fa-video"></i> Clases Sincrónicas
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=orders" class="nav-link">
+                    <i class="fas fa-shopping-cart"></i> Pedidos
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=books" class="nav-link">
+                    <i class="fas fa-book-open"></i> Libros
+                </a>
+                <a href="<?php echo $base_url; ?>index.php?page=admin&action=profile" class="nav-link">
+                    <i class="fas fa-user-cog"></i> Mi Perfil
+                </a>
+                <a href="<?php echo $base_url; ?>logout.php" class="nav-link">
+                    <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h1><i class="fas fa-video"></i> Gestión de Clases Sincrónicas</h1>
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <?php echo htmlspecialchars($currentUser['first_name'] ?? 'Admin'); ?>
+                </div>
+            </header>
+
+            <?php if (isset($success_message)): ?>
+                <div class="flash-message flash-success">
+                    <i class="fas fa-check-circle"></i> <?php echo $success_message; ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($error_message)): ?>
+                <div class="flash-message flash-error">
+                    <i class="fas fa-exclamation-triangle"></i> <?php echo $error_message; ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="content-section">
+                <div class="class-form">
+                    <h2>
+                        <i class="fas fa-<?php echo $editClass ? 'edit' : 'plus-circle'; ?>"></i>
+                        <?php echo $editClass ? 'Editar' : 'Nueva'; ?> Clase Sincrónica
+                    </h2>
             <form method="POST" action="?page=admin&action=sync-classes&sub_action=<?php echo $editClass ? 'edit&class_id=' . $editClass['id'] : 'create'; ?>">
                 <div class="form-grid">
                     <div class="form-group full-width">
@@ -327,21 +709,28 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                     <?php endif; ?>
                 </div>
                 
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> <?php echo $editClass ? 'Actualizar' : 'Crear'; ?> Clase
-                    </button>
-                    <?php if ($editClass): ?>
-                    <a href="?page=admin&action=sync-classes" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Cancelar
-                    </a>
-                    <?php endif; ?>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> <?php echo $editClass ? 'Actualizar' : 'Crear'; ?> Clase
+                        </button>
+                        <?php if ($editClass): ?>
+                        <a href="?page=admin&action=sync-classes" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <?php else: ?>
+                        <a href="?page=admin&action=dashboard" class="btn btn-back">
+                            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="classes-table-container">
+                <div class="table-header">
+                    <h2><i class="fas fa-list"></i> Clases Registradas</h2>
                 </div>
-            </form>
-        </div>
-        
-        <div class="classes-table">
-            <table>
+                <table class="classes-table">
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -356,8 +745,12 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                 <tbody>
                     <?php if (empty($syncClasses)): ?>
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 2rem;">
-                            No hay clases sincrónicas creadas aún
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="fas fa-video-slash"></i>
+                                <h3>No hay clases sincrónicas</h3>
+                                <p>Crea tu primera clase sincrónica usando el formulario anterior</p>
+                            </div>
                         </td>
                     </tr>
                     <?php else: ?>
@@ -389,8 +782,54 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                     <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
-            </table>
-        </div>
+                </table>
+            </div>
+            </div>
+        </main>
     </div>
+
+    <script>
+        // Animación de entrada
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('.class-form');
+            const table = document.querySelector('.classes-table-container');
+            
+            if (form) {
+                form.style.opacity = '0';
+                form.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    form.style.transition = 'all 0.6s ease';
+                    form.style.opacity = '1';
+                    form.style.transform = 'translateY(0)';
+                }, 100);
+            }
+            
+            if (table) {
+                table.style.opacity = '0';
+                table.style.transform = 'translateY(20px)';
+                setTimeout(() => {
+                    table.style.transition = 'all 0.6s ease';
+                    table.style.opacity = '1';
+                    table.style.transform = 'translateY(0)';
+                }, 300);
+            }
+        });
+
+        // Responsive sidebar
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('active');
+        }
+
+        if (window.innerWidth <= 1024) {
+            const header = document.querySelector('.content-header');
+            const menuBtn = document.createElement('button');
+            menuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+            menuBtn.className = 'mobile-menu-btn';
+            menuBtn.style.cssText = 'background: #6366f1; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; margin-right: 1rem;';
+            menuBtn.onclick = toggleSidebar;
+            header.insertBefore(menuBtn, header.firstChild);
+        }
+    </script>
 </body>
 </html>

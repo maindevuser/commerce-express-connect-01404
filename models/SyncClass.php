@@ -108,5 +108,10 @@ class SyncClass {
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
+    
+    // Buscar clase por ID (para PaymentController)
+    public function findById($id) {
+        return $this->readOne($id);
+    }
 }
 ?>
