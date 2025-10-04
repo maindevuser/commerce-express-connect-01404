@@ -537,8 +537,14 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             color: white;
         }
 
+        .btn-calendar {
+            background: linear-gradient(135deg, #4285f4, #357ae8);
+            color: white;
+        }
+
         .btn-edit:hover,
-        .btn-delete:hover {
+        .btn-delete:hover,
+        .btn-calendar:hover {
             transform: translateY(-2px);
         }
 
@@ -870,6 +876,9 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                                 <a href="?page=admin&action=sync-classes&sub_action=edit&class_id=<?php echo $class['id']; ?>" class="btn btn-sm btn-edit">
                                     <i class="fas fa-edit"></i> Editar
                                 </a>
+                                <a href="javascript:void(0)" onclick="addToGoogleCalendar(<?php echo $class['id']; ?>)" class="btn btn-sm btn-calendar">
+                                    <i class="fab fa-google"></i> Mi Calendario
+                                </a>
                                 <a href="?page=admin&action=sync-classes&sub_action=delete&class_id=<?php echo $class['id']; ?>" 
                                    class="btn btn-sm btn-delete" 
                                    onclick="return confirm('¿Estás seguro de eliminar esta clase?')">
@@ -953,6 +962,10 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                 }, 300);
             }
         });
+
+        function addToGoogleCalendar(classId) {
+            window.open('/controllers/GoogleCalendarController.php?action=add&class_id=' + classId, '_blank');
+        }
 
         // Responsive sidebar
         function toggleSidebar() {
