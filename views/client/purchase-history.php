@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../models/Order.php';
 require_once __DIR__ . '/../../models/UserCourse.php';
 require_once __DIR__ . '/../../models/Playlist.php';
 require_once __DIR__ . '/../../models/UserSyncClass.php';
+require_once __DIR__ . '/../../models/SyncClassSchedule.php';
 require_once __DIR__ . '/../../controllers/CartController.php';
 
 // Usar los namespaces correctos
@@ -19,6 +20,7 @@ use Models\Order;
 use Models\UserCourse;
 use Models\Playlist;
 use Models\UserSyncClass;
+use Models\SyncClassSchedule;
 use Controllers\CartController;
 
 // Verificar autenticación
@@ -41,6 +43,7 @@ $orderModel = new Order($pdo);
 $userCourseModel = new UserCourse($pdo);
 $playlistModel = new Playlist($pdo);
 $userSyncClassModel = new UserSyncClass($pdo);
+$scheduleModel = new SyncClassSchedule($pdo);
 
 // Obtener historial de pedidos del usuario
 $orders = $orderModel->readByUserId($userId);
@@ -341,9 +344,6 @@ if ($firstAccessDate) {
                     <?php if (!empty($purchasedSyncClasses)): ?>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; margin-bottom: 1rem;">
                         <h3 style="margin: 0;"><i class="fas fa-video"></i> Mis Clases Sincrónicas</h3>
-                        <a href="../../controllers/IcsController.php?action=download_all" class="btn-access" style="background: var(--primary-color); padding: 10px 20px; font-size: 0.9rem;">
-                            <i class="fas fa-download"></i> Descargar Todas las Clases (.ics)
-                        </a>
                     </div>
                     <div class="courses-grid">
                         <?php foreach ($purchasedSyncClasses as $syncClass): ?>
@@ -363,30 +363,48 @@ if ($firstAccessDate) {
                                     <p class="course-description">
                                         <?php echo htmlspecialchars($syncClass['description'] ?: 'Clase sincrónica en vivo.'); ?>
                                     </p>
-                                    <div class="course-meta">
-                                        <span><i class="fas fa-calendar"></i> Inicio: <?php echo date('d M Y H:i', strtotime($syncClass['start_date'])); ?></span>
-                                    </div>
-                                    <div class="course-meta">
-                                        <span><i class="fas fa-clock"></i> Fin: <?php echo date('d M Y H:i', strtotime($syncClass['end_date'])); ?></span>
-                                    </div>
-                                    <div class="course-meta">
-                                         <span class="course-price">$<?php echo number_format($syncClass['price'] ?? 0, 2); ?></span>
-                                         <span><i class="fas fa-check-circle" style="color: var(--teal-color);"></i> Acceso Completo</span>
-                                    </div>
-                                     <div class="course-actions">
-                                         <?php if ($isPast): ?>
-                                         <button class="btn-access" style="background: #6c757d; cursor: not-allowed;" disabled>
-                                             <i class="fas fa-clock"></i> Clase Finalizada
-                                         </button>
-                                         <?php else: ?>
-                                         <a href="<?php echo htmlspecialchars($syncClass['meeting_link']); ?>" target="_blank" class="btn-access" style="background: #28a745; margin-bottom: 8px;">
-                                             <i class="fas fa-video"></i> Unirse a la Clase
-                                         </a>
-                                         <?php endif; ?>
-                                         <a href="../../controllers/IcsController.php?action=download&class_id=<?php echo $syncClass['id']; ?>" class="btn-access" style="background: #f8f9fa; color: #333; border: 2px solid #e0e0e0;">
-                                             <i class="fas fa-calendar-plus"></i> Agregar a mi Calendario
-                                         </a>
+                                     <div class="course-meta">
+                                         <span><i class="fas fa-calendar"></i> Inicio: <?php echo date('d M Y', strtotime($syncClass['start_date'])); ?></span>
                                      </div>
+                                     <div class="course-meta">
+                                         <span><i class="fas fa-calendar"></i> Fin: <?php echo date('d M Y', strtotime($syncClass['end_date'])); ?></span>
+                                     </div>
+                                     
+                                     <?php 
+                                     $schedules = $scheduleModel->readBySyncClass($syncClass['id']);
+                                     if (!empty($schedules)): 
+                                     ?>
+                                     <div class="course-meta" style="flex-direction: column; align-items: flex-start; background: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 0.5rem;">
+                                         <strong style="margin-bottom: 0.5rem; color: #1e293b;">
+                                             <i class="fas fa-calendar-week"></i> Horarios Semanales:
+                                         </strong>
+                                         <?php foreach ($schedules as $schedule): ?>
+                                         <span style="font-size: 0.9rem; margin-bottom: 0.25rem;">
+                                             • <?php echo SyncClassSchedule::getDayName($schedule['day_of_week']); ?>: 
+                                             <?php echo substr($schedule['start_time'], 0, 5); ?> - <?php echo substr($schedule['end_time'], 0, 5); ?>
+                                         </span>
+                                         <?php endforeach; ?>
+                                     </div>
+                                     <?php endif; ?>
+                                     
+                                     <div class="course-meta">
+                                          <span class="course-price">$<?php echo number_format($syncClass['price'] ?? 0, 2); ?></span>
+                                          <span><i class="fas fa-check-circle" style="color: var(--teal-color);"></i> Acceso Completo</span>
+                                     </div>
+                                      <div class="course-actions">
+                                          <?php if ($isPast): ?>
+                                          <button class="btn-access" style="background: #6c757d; cursor: not-allowed;" disabled>
+                                              <i class="fas fa-clock"></i> Clase Finalizada
+                                          </button>
+                                          <?php else: ?>
+                                          <a href="<?php echo htmlspecialchars($syncClass['meeting_link']); ?>" target="_blank" class="btn-access" style="background: #28a745; margin-bottom: 8px;">
+                                              <i class="fas fa-video"></i> Unirse a la Clase
+                                          </a>
+                                          <?php endif; ?>
+                                          <a href="../../controllers/GoogleCalendarController.php?action=add&class_id=<?php echo $syncClass['id']; ?>" target="_blank" class="btn-access" style="background: linear-gradient(135deg, #4285F4, #34A853); color: white;">
+                                              <i class="fab fa-google"></i> Agregar a Google Calendar
+                                          </a>
+                                      </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>

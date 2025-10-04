@@ -365,6 +365,23 @@ CREATE TABLE `sync_classes` (
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `sync_class_schedules`
+--
+
+CREATE TABLE `sync_class_schedules` (
+  `id` int(11) NOT NULL,
+  `sync_class_id` int(11) NOT NULL,
+  `day_of_week` tinyint(1) NOT NULL COMMENT '0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado',
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  FOREIGN KEY (`sync_class_id`) REFERENCES `sync_classes`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `user_sync_classes`
 --
 

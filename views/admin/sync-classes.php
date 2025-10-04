@@ -11,12 +11,15 @@ if (!AuthController::isAdmin()) {
 
 require_once __DIR__ . '/../../config/Database.php';
 require_once __DIR__ . '/../../models/SyncClass.php';
+require_once __DIR__ . '/../../models/SyncClassSchedule.php';
 use Models\SyncClass;
+use Models\SyncClassSchedule;
 
 $currentUser = AuthController::getCurrentUser();
 $database = new \Database();
 $db = $database->getConnection();
 $syncClassModel = new SyncClass($db);
+$scheduleModel = new SyncClassSchedule($db);
 
 $action = $_GET['sub_action'] ?? '';
 $classId = $_GET['class_id'] ?? '';
@@ -40,6 +43,21 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $syncClassModel->is_active = 1;
         
         if ($syncClassModel->create()) {
+            $classId = $syncClassModel->id;
+            
+            // Guardar horarios
+            if (!empty($_POST['schedules'])) {
+                foreach ($_POST['schedules'] as $schedule) {
+                    if (!empty($schedule['day']) && !empty($schedule['start_time']) && !empty($schedule['end_time'])) {
+                        $scheduleModel->sync_class_id = $classId;
+                        $scheduleModel->day_of_week = intval($schedule['day']);
+                        $scheduleModel->start_time = $schedule['start_time'];
+                        $scheduleModel->end_time = $schedule['end_time'];
+                        $scheduleModel->create();
+                    }
+                }
+            }
+            
             $success_message = "Clase sincrónica creada exitosamente";
         } else {
             $error_message = "Error al crear la clase";
@@ -70,6 +88,22 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $syncClassModel->is_active = $is_active;
         
         if ($syncClassModel->update()) {
+            // Eliminar horarios anteriores
+            $scheduleModel->deleteBySyncClass($classId);
+            
+            // Guardar nuevos horarios
+            if (!empty($_POST['schedules'])) {
+                foreach ($_POST['schedules'] as $schedule) {
+                    if (!empty($schedule['day']) && !empty($schedule['start_time']) && !empty($schedule['end_time'])) {
+                        $scheduleModel->sync_class_id = $classId;
+                        $scheduleModel->day_of_week = intval($schedule['day']);
+                        $scheduleModel->start_time = $schedule['start_time'];
+                        $scheduleModel->end_time = $schedule['end_time'];
+                        $scheduleModel->create();
+                    }
+                }
+            }
+            
             $success_message = "Clase sincrónica actualizada exitosamente";
         } else {
             $error_message = "Error al actualizar la clase";
@@ -93,8 +127,10 @@ $syncClasses = $syncClassModel->readAll();
 
 // Obtener clase para editar
 $editClass = null;
+$editSchedules = [];
 if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $editClass = $syncClassModel->readOne($classId);
+    $editSchedules = $scheduleModel->readBySyncClass($classId);
 }
 ?>
 <!DOCTYPE html>
@@ -727,6 +763,49 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
                         </select>
                     </div>
                     <?php endif; ?>
+                    
+                    <!-- Horarios Semanales -->
+                    <div class="form-group full-width">
+                        <label style="font-size: 1.1rem; color: #1e293b; margin-bottom: 1rem; display: block;">
+                            <i class="fas fa-calendar-week"></i> Horarios Semanales
+                        </label>
+                        <div id="schedules-container" style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.5rem; background: #f8fafc;">
+                            <?php 
+                            $schedulesData = !empty($editSchedules) ? $editSchedules : [];
+                            if (empty($schedulesData)) {
+                                $schedulesData = [['day_of_week' => '', 'start_time' => '', 'end_time' => '']];
+                            }
+                            foreach ($schedulesData as $index => $schedule): 
+                            ?>
+                            <div class="schedule-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; margin-bottom: 1rem; align-items: center;">
+                                <select name="schedules[<?php echo $index; ?>][day]" class="form-control" style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                                    <option value="">Seleccionar día</option>
+                                    <option value="1" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 1) ? 'selected' : ''; ?>>Lunes</option>
+                                    <option value="2" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 2) ? 'selected' : ''; ?>>Martes</option>
+                                    <option value="3" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 3) ? 'selected' : ''; ?>>Miércoles</option>
+                                    <option value="4" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 4) ? 'selected' : ''; ?>>Jueves</option>
+                                    <option value="5" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 5) ? 'selected' : ''; ?>>Viernes</option>
+                                    <option value="6" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 6) ? 'selected' : ''; ?>>Sábado</option>
+                                    <option value="0" <?php echo (isset($schedule['day_of_week']) && $schedule['day_of_week'] == 0) ? 'selected' : ''; ?>>Domingo</option>
+                                </select>
+                                <input type="time" name="schedules[<?php echo $index; ?>][start_time]" 
+                                       value="<?php echo isset($schedule['start_time']) ? substr($schedule['start_time'], 0, 5) : ''; ?>" 
+                                       placeholder="Hora inicio"
+                                       style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                                <input type="time" name="schedules[<?php echo $index; ?>][end_time]" 
+                                       value="<?php echo isset($schedule['end_time']) ? substr($schedule['end_time'], 0, 5) : ''; ?>" 
+                                       placeholder="Hora fin"
+                                       style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                                <button type="button" onclick="removeSchedule(this)" class="btn btn-sm btn-delete" style="padding: 0.5rem 0.75rem;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <button type="button" onclick="addSchedule()" class="btn btn-secondary" style="margin-top: 1rem;">
+                            <i class="fas fa-plus"></i> Agregar Horario
+                        </button>
+                    </div>
                 </div>
                 
                     <div class="form-actions">
@@ -809,6 +888,46 @@ if ($action === 'edit' && $classId && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     </div>
 
     <script>
+        let scheduleIndex = <?php echo count($schedulesData); ?>;
+        
+        function addSchedule() {
+            const container = document.getElementById('schedules-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'schedule-row';
+            newRow.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; margin-bottom: 1rem; align-items: center;';
+            
+            newRow.innerHTML = `
+                <select name="schedules[${scheduleIndex}][day]" class="form-control" style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                    <option value="">Seleccionar día</option>
+                    <option value="1">Lunes</option>
+                    <option value="2">Martes</option>
+                    <option value="3">Miércoles</option>
+                    <option value="4">Jueves</option>
+                    <option value="5">Viernes</option>
+                    <option value="6">Sábado</option>
+                    <option value="0">Domingo</option>
+                </select>
+                <input type="time" name="schedules[${scheduleIndex}][start_time]" placeholder="Hora inicio" style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                <input type="time" name="schedules[${scheduleIndex}][end_time]" placeholder="Hora fin" style="padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 10px; font-family: 'Poppins', sans-serif;">
+                <button type="button" onclick="removeSchedule(this)" class="btn btn-sm btn-delete" style="padding: 0.5rem 0.75rem;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            
+            container.appendChild(newRow);
+            scheduleIndex++;
+        }
+        
+        function removeSchedule(button) {
+            const row = button.closest('.schedule-row');
+            const container = document.getElementById('schedules-container');
+            if (container.querySelectorAll('.schedule-row').length > 1) {
+                row.remove();
+            } else {
+                alert('Debe haber al menos un horario');
+            }
+        }
+    
         // Animación de entrada
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.querySelector('.class-form');
